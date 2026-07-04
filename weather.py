@@ -1,171 +1,279 @@
 import streamlit as st
 import requests
+from datetime import datetime
 
-st.set_page_config(page_title="Weather World", layout="centered")
+# ----------------------------
+# 설정
+# ----------------------------
 
+API_KEY = "여기에_API_KEY"
 
-@st.cache_data(ttl=600)
-def get_weather():
-    url = "https://wttr.in/Bangbae-dong?format=j1"
+LAT = 37.4816     # 방배동
+LON = 126.9820
 
-    default = (22, "Clear", "맑음", "보통", "15km", "05:32", "19:51")
+st.set_page_config(
+    page_title="방배동 날씨",
+    page_icon="🌤️",
+    layout="wide"
+)
 
-    try:
-        r = requests.get(url, timeout=5)
-        data = r.json()
+# ----------------------------
+# 데이터 가져오기
+# ----------------------------
 
-        c = data["current_condition"][0]
-        a = data["weather"][0]["astronomy"][0]
+weather_url = f"https://api.openweathermap.org/data/2.5/weather?lat={LAT}&lon={LON}&appid={API_KEY}&units=metric&lang=kr"
 
-        temp = round(float(c["temp_C"]))
-        desc = c["weatherDesc"][0]["value"].lower()
-        visibility = c["visibility"] + "km"
-        humidity = int(c["humidity"])
+air_url = f"https://api.openweathermap.org/data/2.5/air_pollution?lat={LAT}&lon={LON}&appid={API_KEY}"
 
-        dust = "좋음" if humidity > 85 else "보통" if humidity > 40 else "나쁨"
+weather = requests.get(weather_url).json()
+air = requests.get(air_url).json()
 
-        sunrise = a["sunrise"]
-        sunset = a["sunset"]
+temp = weather["main"]["temp"]
+humidity = weather["main"]["humidity"]
+visibility = weather["visibility"] / 1000
 
-        weather = "Clear"
-        kr = "맑음"
+weather_id = weather["weather"][0]["id"]
+description = weather["weather"][0]["description"]
 
-        if "cloud" in desc:
-            weather = "Clouds"
-            kr = "구름"
-        elif "rain" in desc:
-            weather = "Rain"
-            kr = "비"
-        elif "snow" in desc:
-            weather = "Snow"
-            kr = "눈"
+sunrise = datetime.fromtimestamp(weather["sys"]["sunrise"]).strftime("%H:%M")
+sunset = datetime.fromtimestamp(weather["sys"]["sunset"]).strftime("%H:%M")
 
-        return temp, weather, kr, dust, visibility, sunrise, sunset
+aqi = air["list"][0]["main"]["aqi"]
 
-    except:
-        return default
+# ----------------------------
+# AQI
+# ----------------------------
 
+aqi_text = {
+    1:"😀 좋음",
+    2:"🙂 보통",
+    3:"😷 나쁨",
+    4:"🤢 매우 나쁨",
+    5:"☠️ 최악"
+}
 
-temp, weather_main, weather_desc, dust, visibility, sunrise, sunset = get_weather()
+# ----------------------------
+# 복장 추천
+# ----------------------------
 
-dust_color = "#2ed573" if dust in ["좋음", "보통"] else "#ff4757"
-st.markdown(f"""
+def outfit(temp):
+
+    if temp >= 28:
+        return "🩳 민소매, 반바지, 슬리퍼"
+
+    elif temp >= 23:
+        return "👕 반팔 + 반바지"
+
+    elif temp >= 20:
+        return "👕 반팔 + 긴바지"
+
+    elif temp >= 17:
+        return "👔 얇은 셔츠, 가디건"
+
+    elif temp >= 12:
+        return "🧥 자켓"
+
+    elif temp >= 9:
+        return "🧥 트렌치코트"
+
+    elif temp >= 5:
+        return "🧥 코트"
+
+    else:
+        return "🧥 패딩, 목도리, 장갑"
+
+# ----------------------------
+# 배경
+# ----------------------------
+
+def background(weather_id):
+
+    if weather_id == 800:
+
+        return """
 <style>
 
-.stApp {{
-    background: {{
-        "Clear": "linear-gradient(to bottom,#74b9ff,#a29bfe)",
-        "Clouds": "linear-gradient(to bottom,#636e72,#b2bec3)",
-        "Rain": "linear-gradient(to bottom,#2d3436,#636e72)",
-        "Snow": "linear-gradient(to bottom,#dfe6e9,#ffffff)"
-    }}.get("{weather_main}", "#74b9ff");
-    overflow:hidden;
-}}
+.stApp{
+background:linear-gradient(#79c8ff,#d7f2ff);
+}
 
-/* ===== 태양 ===== */
-.sun {{
-    position: fixed;
-    top: 80px;
-    right: 80px;
-    width: 90px;
-    height: 90px;
-    background: radial-gradient(circle,#fff176,#ff9800);
-    border-radius: 50%;
-    box-shadow: 0 0 40px orange;
-    animation: pulse 3s infinite;
-}}
+.sky{
+position:fixed;
+font-size:70px;
+top:5%;
+left:5%;
+animation:move 40s linear infinite;
+}
 
-@keyframes pulse {{
-    0% {{ transform: scale(1); }}
-    50% {{ transform: scale(1.15); }}
-    100% {{ transform: scale(1); }}
-}}
+.ground{
+position:fixed;
+bottom:0;
+width:100%;
+height:180px;
+background:#4CAF50;
+}
 
-/* ===== 구름 ===== */
-.cloud {{
-    position: fixed;
-    width: 120px;
-    height: 40px;
-    background: white;
-    border-radius: 50px;
-    opacity: 0.8;
-    animation: move 25s linear infinite;
-}}
-
-@keyframes move {{
-    0% {{ left: -200px; }}
-    100% {{ left: 110%; }}
-}}
-
-/* ===== 비 ===== */
-.rain {{
-    position: fixed;
-    width: 2px;
-    height: 20px;
-    background: #74b9ff;
-    animation: rain 1s linear infinite;
-}}
-
-@keyframes rain {{
-    0% {{ top: -20px; }}
-    100% {{ top: 100vh; }}
-}}
-
-/* ===== 땅 ===== */
-.ground {{
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 130px;
-    background: #55efc4;
-    border-radius: 50% 50% 0 0;
-    z-index: 1;
-}}
-
-/* ===== 카드 ===== */
-.card {{
-    background: white;
-    padding: 20px;
-    margin: 15px;
-    border-radius: 20px;
-    position: relative;
-    z-index: 10;
-}}
+@keyframes move{
+0%{transform:translateX(-100px);}
+100%{transform:translateX(1500px);}
+}
 
 </style>
-""", unsafe_allow_html=True)
-bg = "<div>"
 
-if weather_main == "Clear":
-    bg += "<div class='sun'></div>"
-    bg += "<div class='cloud' style='top:120px;'></div>"
-    bg += "<div class='cloud' style='top:200px; animation-duration:35s;'></div>"
-
-elif weather_main == "Clouds":
-    bg += "<div class='cloud' style='top:120px;'></div>"
-    bg += "<div class='cloud' style='top:200px;'></div>"
-
-elif weather_main == "Rain":
-    bg += "<div class='cloud' style='top:120px;'></div>"
-    for i in range(20):
-        bg += f"<div class='rain' style='left:{i*5}%'></div>"
-
-bg += "</div><div class='ground'></div>"
-
-st.markdown(bg, unsafe_allow_html=True)
-st.markdown(f"""
-<div class='card'>
-<h2>🌡 온도: {temp}°C</h2>
-<p>날씨: {weather_desc}</p>
+<div class='sky'>
+☀️ ☁️ ☁️
 </div>
 
-<div class='card'>
-<h3>📊 기상 인덱스</h3>
+<div class='ground'></div>
 
-<p>🌅 일출: {sunrise}</p>
-<p>🌇 일몰: {sunset}</p>
+"""
 
-<p>😷 미세먼지: {dust}</p>
-<p>👁 가시거리: {visibility}</p>
+    elif 200 <= weather_id < 600:
+
+        return """
+<style>
+
+.stApp{
+background:#6c7a89;
+}
+
+.sky{
+position:fixed;
+font-size:65px;
+top:10%;
+animation:rain 15s linear infinite;
+}
+
+.ground{
+position:fixed;
+bottom:0;
+width:100%;
+height:180px;
+background:#2E7D32;
+}
+
+@keyframes rain{
+0%{transform:translateY(-100px);}
+100%{transform:translateY(100px);}
+}
+
+</style>
+
+<div class='sky'>
+🌧️ 🌧️ 🌧️ 🌧️
 </div>
-""", unsafe_allow_html=True)
+
+<div class='ground'></div>
+
+"""
+
+    elif 600 <= weather_id <700:
+
+        return """
+<style>
+
+.stApp{
+background:#dbefff;
+}
+
+.sky{
+position:fixed;
+font-size:60px;
+top:10%;
+animation:snow 10s linear infinite;
+}
+
+.ground{
+position:fixed;
+bottom:0;
+width:100%;
+height:180px;
+background:white;
+}
+
+@keyframes snow{
+0%{transform:translateY(-50px);}
+100%{transform:translateY(150px);}
+}
+
+</style>
+
+<div class='sky'>
+❄️ ❄️ ☁️ ❄️
+</div>
+
+<div class='ground'></div>
+
+"""
+
+    else:
+
+        return """
+<style>
+
+.stApp{
+background:linear-gradient(#98b4d4,#eaf4ff);
+}
+
+.sky{
+position:fixed;
+font-size:70px;
+top:10%;
+animation:move 35s linear infinite;
+}
+
+.ground{
+position:fixed;
+bottom:0;
+width:100%;
+height:180px;
+background:#66BB6A;
+}
+
+@keyframes move{
+0%{transform:translateX(-300px);}
+100%{transform:translateX(1600px);}
+}
+
+</style>
+
+<div class='sky'>
+☁️ ☁️ ☁️ 🌤️
+</div>
+
+<div class='ground'></div>
+
+"""
+
+st.markdown(background(weather_id),unsafe_allow_html=True)
+
+# ----------------------------
+# 제목
+# ----------------------------
+
+st.title("🌤️ 방배동 실시간 날씨")
+
+st.subheader(description.capitalize())
+
+c1,c2,c3,c4 = st.columns(4)
+
+c1.metric("🌡️ 기온",f"{temp:.1f}°C")
+c2.metric("💧 습도",f"{humidity}%")
+c3.metric("👀 가시거리",f"{visibility:.1f} km")
+c4.metric("🌫️ 미세먼지",aqi_text[aqi])
+
+st.divider()
+
+a,b = st.columns(2)
+
+with a:
+    st.metric("🌅 일출",sunrise)
+
+with b:
+    st.metric("🌇 일몰",sunset)
+
+st.divider()
+
+st.header("👕 추천 복장")
+
+st.success(outfit(temp))
