@@ -1,18 +1,18 @@
 import streamlit as st
 import requests
+import random
 
-st.set_page_config(page_title="방배동 날씨", layout="centered")
+st.set_page_config(page_title="3D 날씨 시뮬레이터", layout="centered")
 
 # =========================
-# 날씨 함수 (여기 포함)
+# 1. 날씨 데이터
 # =========================
 @st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
 
     try:
-        r = requests.get(url, timeout=5)
-        data = r.json()
+        data = requests.get(url, timeout=5).json()
 
         current = data["current_condition"][0]
         astro = data["weather"][0]["astronomy"][0]
@@ -47,13 +47,10 @@ def get_weather():
         return 22, "Clear", 60, "보통", 15, "06:00", "19:00"
 
 
-# =========================
-# 데이터 로드
-# =========================
 temp, weather, humidity, dust, visibility, sunrise, sunset = get_weather()
 
 # =========================
-# 배경
+# 2. 테마
 # =========================
 sky = {
     "Clear": "#74b9ff",
@@ -63,110 +60,211 @@ sky = {
 }.get(weather)
 
 ground = {
-    "Clear": "#55efc4",
-    "Clouds": "#a4b0be",
-    "Rain": "#2ecc71",
+    "Clear": "#2ecc71",
+    "Clouds": "#95a5a6",
+    "Rain": "#27ae60",
     "Snow": "#ffffff"
 }.get(weather)
 
-
 # =========================
-# CSS
+# 3. CSS (3D + 움직임 핵심)
 # =========================
 st.markdown(f"""
 <style>
 
 body {{
     background: {sky};
+    overflow-x: hidden;
 }}
 
+/* =======================
+   🌄 3D 땅 (언덕)
+======================= */
 .ground {{
     position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 180px;
+    bottom: -120px;
+    width: 140%;
+    height: 300px;
+    left: -20%;
     background: {ground};
-    border-radius: 50% 50% 0 0;
-    z-index: -1;
-}}
-
-.card {{
-    background: white;
-    padding: 20px;
-    border-radius: 20px;
-    margin-top: 30px;
-}}
-
-.sky {{
-    position: fixed;
-    top: 0;
-    width: 100%;
-    height: 60vh;
-    overflow: hidden;
-}}
-
-.sun {{
-    position: absolute;
-    top: 50px;
-    right: 50px;
-    width: 70px;
-    height: 70px;
-    background: yellow;
     border-radius: 50%;
-    box-shadow: 0 0 30px yellow;
+    z-index: -1;
+    box-shadow: inset 0 20px 40px rgba(0,0,0,0.1);
+    animation: groundMove 6s ease-in-out infinite alternate;
 }}
 
+@keyframes groundMove {{
+    0% {{ transform: scale(1); }}
+    100% {{ transform: scale(1.03); }}
+}}
+
+/* =======================
+   ☁️ 구름 (부드러운 이동)
+======================= */
 .cloud {{
-    position: absolute;
-    width: 120px;
-    height: 40px;
+    position: fixed;
+    width: 140px;
+    height: 50px;
     background: white;
     border-radius: 50px;
+    opacity: 0.85;
+    filter: blur(0.2px);
+    animation: cloudMove 25s linear infinite;
 }}
 
-.rain {{
+.cloud::before,
+.cloud::after {{
+    content: "";
     position: absolute;
-    width: 2px;
-    height: 15px;
-    background: #74b9ff;
-    animation: fall 1s linear infinite;
+    background: white;
+    border-radius: 50%;
 }}
 
-@keyframes fall {{
-    0% {{ transform: translateY(0); }}
-    100% {{ transform: translateY(60vh); }}
+.cloud::before {{
+    width: 60px;
+    height: 60px;
+    top: -25px;
+    left: 20px;
+}}
+
+.cloud::after {{
+    width: 80px;
+    height: 80px;
+    top: -35px;
+    right: 20px;
+}}
+
+@keyframes cloudMove {{
+    0% {{ transform: translateX(-200px); }}
+    100% {{ transform: translateX(120vw); }}
+}}
+
+/* =======================
+   ☀️ 태양 (3D 느낌 회전)
+======================= */
+.sun {{
+    position: fixed;
+    top: 60px;
+    right: 80px;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, #fff200, #ffa502);
+    border-radius: 50%;
+    box-shadow: 0 0 50px #ffa502;
+    animation: sunPulse 3s ease-in-out infinite;
+}}
+
+@keyframes sunPulse {{
+    0% {{ transform: scale(1); }}
+    50% {{ transform: scale(1.1); }}
+    100% {{ transform: scale(1); }}
+}}
+
+/* =======================
+   🌧️ 비 (진짜 떨어지는 느낌)
+======================= */
+.rain {{
+    position: fixed;
+    width: 2px;
+    height: 18px;
+    background: #74b9ff;
+    animation: rainFall 0.8s linear infinite;
+    opacity: 0.7;
+}}
+
+@keyframes rainFall {{
+    0% {{ transform: translateY(-20px); }}
+    100% {{ transform: translateY(100vh); }}
+}}
+
+/* =======================
+   ❄️ 눈
+======================= */
+.snow {{
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    animation: snowFall 3s linear infinite;
+}}
+
+@keyframes snowFall {{
+    0% {{ transform: translateY(-20px) translateX(0); }}
+    100% {{ transform: translateY(100vh) translateX(30px); }}
+}}
+
+/* =======================
+   📦 카드 (고정 + 안정)
+======================= */
+.card {{
+    background: white;
+    padding: 22px;
+    border-radius: 20px;
+    margin-top: 30px;
+    box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    position: relative;
+    z-index: 10;
+}}
+
+/* =======================
+   🌫️ 흐림 효과 (Cloudy)
+======================= */
+.blur {{
+    filter: brightness(0.8);
 }}
 
 </style>
 """, unsafe_allow_html=True)
 
-
 # =========================
-# 오브젝트
+# 4. 오브젝트 생성
 # =========================
 obj = ""
 
 if weather == "Clear":
-    obj = "<div class='sun'></div><div class='cloud' style='top:120px; left:0'></div>"
+    obj = """
+    <div class='sun'></div>
+    <div class='cloud' style='top:80px;'></div>
+    """
+
 elif weather == "Clouds":
-    obj = "<div class='cloud' style='top:80px; left:0'></div><div class='cloud' style='top:140px; left:150px'></div>"
+    obj = """
+    <div class='cloud' style='top:80px;'></div>
+    <div class='cloud' style='top:140px; animation-delay:5s'></div>
+    """
+
 elif weather == "Rain":
-    obj = "<div class='cloud' style='top:80px'></div><div class='rain' style='left:40%'></div><div class='rain' style='left:60%'></div>"
+    obj = """
+    <div class='cloud' style='top:80px'></div>
+""" + "".join(
+        f"<div class='rain' style='left:{i*10}%; animation-delay:{i*0.2}s'></div>"
+        for i in range(10)
+    )
+
+elif weather == "Snow":
+    obj = """
+    <div class='cloud' style='top:80px'></div>
+""" + "".join(
+        f"<div class='snow' style='left:{i*8}%; animation-delay:{i*0.3}s'></div>"
+        for i in range(12)
+    )
 
 # =========================
-# UI
+# 5. UI 출력
 # =========================
 st.markdown("<div class='ground'></div>", unsafe_allow_html=True)
-st.markdown(f"<div class='sky'>{obj}</div>", unsafe_allow_html=True)
+st.markdown(f"<div>{obj}</div>", unsafe_allow_html=True)
 
-st.title("🌤️ 방배동 날씨")
+st.title("🌤️ 3D 방배동 날씨 월드")
 
 st.markdown(f"""
 <div class='card'>
 <h2>{temp}°C</h2>
+<p>날씨: {weather}</p>
 <p>미세먼지: {dust}</p>
-<p>가시거리: {visibility} km</p>
 <p>습도: {humidity}%</p>
+<p>가시거리: {visibility} km</p>
 <p>일출: {sunrise} / 일몰: {sunset}</p>
 </div>
 """, unsafe_allow_html=True)
