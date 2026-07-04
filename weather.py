@@ -1,227 +1,211 @@
-import streamlit as st
 import requests
 
-# =========================
-# 1. 기본 설정
-# =========================
-st.set_page_config(page_title="방배동 3D 날씨 월드", layout="centered")
-
-st.markdown("""
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
-
-
-# =========================
-# 2. 날씨 데이터
-# =========================
-@st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
 
+    default = (22, "Clear", "맑음", "보통", "15km", "05:32", "19:51")
+
     try:
-        data = requests.get(url, timeout=5).json()
+        r = requests.get(url, timeout=5)
+        data = r.json()
 
         current = data["current_condition"][0]
         astro = data["weather"][0]["astronomy"][0]
 
-        temp = int(current["temp_C"])
-        desc = current["weatherDesc"][0]["value"].lower()
+        temp = round(float(current["temp_C"]))
+        desc_en = current["weatherDesc"][0]["value"].lower()
+
+        visibility = current["visibility"] + "km"
         humidity = int(current["humidity"])
-        visibility = int(current["visibility"])
 
-        sunrise = astro["sunrise"]
-        sunset = astro["sunset"]
-
-        # 미세먼지 (대체 로직)
-        if humidity > 80:
+        if humidity > 85:
             dust = "좋음"
-        elif humidity > 50:
+        elif humidity > 40:
             dust = "보통"
         else:
             dust = "나쁨"
 
-        # 날씨 분류
-        if "rain" in desc:
-            weather = "Rain"
-        elif "snow" in desc:
-            weather = "Snow"
-        elif "cloud" in desc or "overcast" in desc:
-            weather = "Clouds"
-        else:
-            weather = "Clear"
+        sunrise = astro["sunrise"]
+        sunset = astro["sunset"]
 
-        return temp, weather, humidity, dust, visibility, sunrise, sunset
+        weather_main = "Clear"
+        weather_desc = "맑음"
+
+        if "cloud" in desc_en or "overcast" in desc_en:
+            weather_main = "Clouds"
+            weather_desc = "구름 많음"
+
+        elif "rain" in desc_en or "drizzle" in desc_en:
+            weather_main = "Rain"
+            weather_desc = "비"
+
+        elif "snow" in desc_en:
+            weather_main = "Snow"
+            weather_desc = "눈"
+
+        return temp, weather_main, weather_desc, dust, visibility, sunrise, sunset
 
     except:
-        return 22, "Clear", 60, "보통", 15, "06:00", "19:00"
+        return default
+        import streamlit as st
+from weather_engine import get_weather
 
+# =========================
+# 1. 기본 설정
+# =========================
+st.set_page_config(page_title="날씨 월드", layout="centered")
 
-temp, weather, humidity, dust, visibility, sunrise, sunset = get_weather()
+temp, weather_main, weather_desc, dust, visibility, sunrise, sunset = get_weather()
+
+dust_color = "#2ed573" if dust in ["좋음", "보통"] else "#ff4757"
 
 
 # =========================
-# 3. 테마
+# 2. 날씨 테마 (핵심 수정)
 # =========================
-sky_color = {
-    "Clear": "#74b9ff",
-    "Clouds": "#636e72",
-    "Rain": "#2d3436",
-    "Snow": "#dfe6e9"
-}.get(weather)
+theme = {
+    "Clear": {
+        "sky": "linear-gradient(to bottom, #74b9ff, #a29bfe)",
+        "sun": True,
+        "rain": False,
+        "cloud": True
+    },
+    "Clouds": {
+        "sky": "linear-gradient(to bottom, #636e72, #b2bec3)",
+        "sun": False,
+        "rain": False,
+        "cloud": True
+    },
+    "Rain": {
+        "sky": "linear-gradient(to bottom, #2d3436, #636e72)",
+        "sun": False,
+        "rain": True,
+        "cloud": True
+    },
+    "Snow": {
+        "sky": "linear-gradient(to bottom, #dfe6e9, #ffffff)",
+        "sun": False,
+        "rain": False,
+        "cloud": True
+    }
+}
 
-ground_color = {
-    "Clear": "#2ecc71",
-    "Clouds": "#95a5a6",
-    "Rain": "#27ae60",
-    "Snow": "#ffffff"
-}.get(weather)
-
-
-# =========================
-# 4. 오브젝트 생성
-# =========================
-obj = ""
-
-if weather == "Clear":
-    obj = """
-    <div class='sun'></div>
-    <div class='cloud c1'></div>
-    <div class='cloud c2'></div>
-    """
-
-elif weather == "Clouds":
-    obj = """
-    <div class='cloud c1'></div>
-    <div class='cloud c2'></div>
-    """
-
-elif weather == "Rain":
-    obj = """
-    <div class='cloud c1'></div>
-""" + "".join(
-        f"<div class='rain' style='left:{i*10}%; animation-delay:{i*0.2}s'></div>"
-        for i in range(12)
-    )
-
-elif weather == "Snow":
-    obj = """
-    <div class='cloud c1'></div>
-""" + "".join(
-        f"<div class='snow' style='left:{i*8}%; animation-delay:{i*0.3}s'></div>"
-        for i in range(12)
-    )
+t = theme.get(weather_main, theme["Clear"])
 
 
 # =========================
-# 5. CSS (완전 안정 레이어 구조)
+# 3. CSS (중요: z-index 완전 고정)
 # =========================
 st.markdown(f"""
 <style>
 
-/* ===== 전체 캔버스 ===== */
-.scene {{
+html, body {{
+    margin:0;
+    padding:0;
+}}
+
+.stApp {{
+    background: {t["sky"]};
+    overflow:hidden;
+}}
+
+/* ===== 배경 레이어 ===== */
+.bg-layer {{
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -10;
-    pointer-events: none;
+    width:100%;
+    height:100%;
+    z-index:0;
+    pointer-events:none;
 }}
 
-/* ===== 하늘 ===== */
-.sky {{
-    position: absolute;
-    width: 100%;
-    height: 70vh;
-    background: {sky_color};
-}}
-
-/* ===== 땅 (3D 언덕) ===== */
-.ground {{
-    position: absolute;
-    bottom: -120px;
-    width: 140%;
-    height: 300px;
-    left: -20%;
-    background: {ground_color};
-    border-radius: 50%;
-    box-shadow: inset 0 20px 40px rgba(0,0,0,0.15);
-}}
-
-/* ===== 태양 ===== */
+/* 태양 */
 .sun {{
-    position: absolute;
-    top: 60px;
-    right: 80px;
-    width: 80px;
-    height: 80px;
-    background: radial-gradient(circle, #fff200, #ffa502);
-    border-radius: 50%;
-    box-shadow: 0 0 50px #ffa502;
+    position:absolute;
+    top:80px;
+    right:80px;
+    width:80px;
+    height:80px;
+    background: radial-gradient(circle,#fff176,#ff9800);
+    border-radius:50%;
+    animation: pulse 3s infinite;
 }}
 
-/* ===== 구름 ===== */
+@keyframes pulse {{
+    0% {{ transform: scale(1); }}
+    50% {{ transform: scale(1.1); }}
+    100% {{ transform: scale(1); }}
+}}
+
+/* 구름 */
 .cloud {{
-    position: absolute;
-    width: 140px;
-    height: 50px;
-    background: white;
-    border-radius: 50px;
-    opacity: 0.85;
-    animation: move 30s linear infinite;
+    position:absolute;
+    background:#fff;
+    width:120px;
+    height:40px;
+    border-radius:50px;
+    opacity:0.8;
+    animation: moveCloud 20s linear infinite;
 }}
 
-.c1 {{ top: 80px; left: -200px; }}
-.c2 {{ top: 150px; left: -300px; animation-delay: 5s; }}
-
-@keyframes move {{
-    0% {{ transform: translateX(0); }}
-    100% {{ transform: translateX(120vw); }}
+.cloud::before, .cloud::after {{
+    content:"";
+    position:absolute;
+    background:#fff;
+    border-radius:50%;
 }}
 
-/* ===== 비 ===== */
+.cloud::before {{
+    width:60px;
+    height:60px;
+    top:-20px;
+    left:10px;
+}}
+
+.cloud::after {{
+    width:50px;
+    height:50px;
+    top:-15px;
+    right:10px;
+}}
+
+@keyframes moveCloud {{
+    0% {{ left:-200px; }}
+    100% {{ left:110%; }}
+}}
+
+/* 비 */
 .rain {{
-    position: absolute;
-    width: 2px;
-    height: 18px;
-    background: #74b9ff;
-    animation: fall 0.8s linear infinite;
+    position:absolute;
+    width:2px;
+    height:20px;
+    background:#74b9ff;
+    animation: rainFall 1s linear infinite;
 }}
 
-@keyframes fall {{
-    0% {{ transform: translateY(-20px); }}
-    100% {{ transform: translateY(100vh); }}
+@keyframes rainFall {{
+    0% {{ top:-20px; }}
+    100% {{ top:100vh; }}
 }}
 
-/* ===== 눈 ===== */
-.snow {{
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background: white;
-    border-radius: 50%;
-    animation: snow 3s linear infinite;
+/* 땅 */
+.ground {{
+    position:fixed;
+    bottom:0;
+    width:100%;
+    height:140px;
+    background:#55efc4;
+    border-radius:50% 50% 0 0;
+    z-index:1;
 }}
 
-@keyframes snow {{
-    0% {{ transform: translateY(-20px); }}
-    100% {{ transform: translateY(100vh); }}
-}}
-
-/* ===== 카드 (최상단 고정) ===== */
+/* 카드 */
 .card {{
-    position: relative;
-    z-index: 10;
-    background: white;
-    padding: 22px;
-    border-radius: 20px;
-    margin-top: 25px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    background:white;
+    padding:20px;
+    border-radius:20px;
+    margin:20px 0;
+    z-index:10;
+    position:relative;
 }}
 
 </style>
@@ -229,29 +213,42 @@ st.markdown(f"""
 
 
 # =========================
-# 6. 렌더링 구조 (핵심)
+# 4. 배경 렌더링 (핵심)
 # =========================
-st.markdown(f"""
-<div class='scene'>
-    <div class='sky'></div>
-    {obj}
-    <div class='ground'></div>
-</div>
-""", unsafe_allow_html=True)
+bg_html = "<div class='bg-layer'>"
+
+if t["sun"]:
+    bg_html += "<div class='sun'></div>"
+
+if t["cloud"]:
+    for i in range(3):
+        bg_html += f"<div class='cloud' style='top:{80+i*60}px; animation-duration:{15+i*5}s'></div>"
+
+if t["rain"]:
+    for i in range(30):
+        bg_html += f"<div class='rain' style='left:{i*3}%'></div>"
+
+bg_html += "</div>"
+
+bg_html += "<div class='ground'></div>"
+
+st.markdown(bg_html, unsafe_allow_html=True)
 
 
 # =========================
-# 7. UI
+# 5. UI (인덱스 + 설명 강화)
 # =========================
-st.title("🌤️ 방배동 3D 날씨 월드")
-
 st.markdown(f"""
 <div class='card'>
-<h2>🌡️ {temp}°C</h2>
-<p>날씨: {weather}</p>
-<p>미세먼지: {dust}</p>
-<p>습도: {humidity}%</p>
-<p>가시거리: {visibility} km</p>
-<p>일출: {sunrise} / 일몰: {sunset}</p>
+<h2>🌡 현재 온도: {temp}°C</h2>
+<p>날씨 상태: {weather_desc}</p>
+</div>
+
+<div class='card'>
+<h3>📊 기상 인덱스</h3>
+<p>🌅 일출: {sunrise}</p>
+<p>🌇 일몰: {sunset}</p>
+<p>😷 미세먼지: {dust}</p>
+<p>👁 가시거리: {visibility}</p>
 </div>
 """, unsafe_allow_html=True)
