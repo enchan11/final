@@ -9,7 +9,8 @@ st.set_page_config(page_title="날씨", layout="centered")
 @st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
-    default = (22, "맑음", "맑음", "보통", "15km", "05:32", "19:51")
+
+    default = (22, "맑음", "15km", "보통", "05:32", "19:51")
 
     try:
         r = requests.get(url, timeout=5)
@@ -21,7 +22,18 @@ def get_weather():
         temp = int(cur["temp_C"])
         desc_en = cur["weatherDesc"][0]["value"].lower()
 
-        # 🌤️ 영어 → 한글 변환 (핵심 수정)
+        visibility = cur.get("visibility", "15") + "km"
+        humidity = int(cur["humidity"])
+
+        # 🌫️ 미세먼지 (간이 계산)
+        if humidity > 80:
+            dust = "좋음 😄"
+        elif humidity > 50:
+            dust = "보통 😐"
+        else:
+            dust = "나쁨 😷"
+
+        # 🌤️ 날씨 분류
         if "cloud" in desc_en:
             weather = "구름"
         elif "rain" in desc_en:
@@ -31,55 +43,67 @@ def get_weather():
         else:
             weather = "맑음"
 
-        return temp, weather, astro["sunrise"], astro["sunset"]
+        return temp, weather, visibility, dust, astro["sunrise"], astro["sunset"]
 
     except:
         return default
 
 
-temp, weather, sunrise, sunset = get_weather()
+temp, weather, visibility, dust, sunrise, sunset = get_weather()
 
 # =========================
-# CSS (땅 포함 완전 안정)
+# 🌈 날씨별 "감정 배경"
+# =========================
+theme = {
+    "맑음": {
+        "bg": "linear-gradient(to bottom, #74b9ff, #a29bfe)",
+        "ground": "#2ecc71",
+        "clouds": 1,
+        "dark": 0
+    },
+    "구름": {
+        "bg": "linear-gradient(to bottom, #636e72, #b2bec3)",
+        "ground": "#27ae60",
+        "clouds": 4,
+        "dark": 1
+    },
+    "비": {
+        "bg": "linear-gradient(to bottom, #2d3436, #636e72)",
+        "ground": "#1e824c",
+        "clouds": 3,
+        "dark": 2
+    },
+    "눈": {
+        "bg": "linear-gradient(to bottom, #dfe6e9, #ffffff)",
+        "ground": "#ffffff",
+        "clouds": 2,
+        "dark": 0
+    }
+}[weather]
+
+# =========================
+# CSS
 # =========================
 st.markdown(f"""
 <style>
 
-/* 배경 */
 html, body, [data-testid="stAppViewContainer"] {{
-    background: linear-gradient(to bottom, #74b9ff, #a29bfe);
+    background: {theme["bg"]};
 }}
 
-/* =========================
-   🌍 진짜 "땅바닥"
-========================= */
+/* 🌍 땅 */
 .ground {{
     position: fixed;
     bottom: 0;
-    left: 0;
     width: 100%;
-    height: 180px;
-    background: linear-gradient(to top, #2ecc71, #27ae60);
+    height: 200px;
+    background: {theme["ground"]};
     border-top-left-radius: 80px;
     border-top-right-radius: 80px;
-    box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
     z-index: 0;
 }}
 
-/* 태양 */
-.sun {{
-    position: fixed;
-    top: 60px;
-    right: 60px;
-    width: 80px;
-    height: 80px;
-    background: #ffe066;
-    border-radius: 50%;
-    box-shadow: 0 0 40px #ffe066;
-    z-index: 1;
-}}
-
-/* 구름 */
+/* ☁️ 구름 */
 .cloud {{
     position: fixed;
     top: 120px;
@@ -87,13 +111,40 @@ html, body, [data-testid="stAppViewContainer"] {{
     height: 40px;
     background: white;
     border-radius: 50px;
-    animation: move 25s linear infinite;
+    opacity: 0.9;
+    animation: move 30s linear infinite;
     z-index: 1;
 }}
 
 @keyframes move {{
     0% {{ left: -150px; }}
     100% {{ left: 110%; }}
+}}
+
+/* 🌧️ 비 */
+.rain {{
+    position: fixed;
+    width: 2px;
+    height: 15px;
+    background: #74b9ff;
+    animation: fall 1s linear infinite;
+    z-index: 1;
+}}
+
+@keyframes fall {{
+    0% {{ top: -20px; }}
+    100% {{ top: 100vh; }}
+}}
+
+/* 🌫️ 어두움 오버레이 */
+.dark {{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,{theme["dark"] * 0.15});
+    z-index: 0;
 }}
 
 /* 카드 */
@@ -104,7 +155,6 @@ html, body, [data-testid="stAppViewContainer"] {{
     margin-top: 20px;
     position: relative;
     z-index: 5;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
 }}
 
 .grid {{
@@ -127,27 +177,27 @@ html, body, [data-testid="stAppViewContainer"] {{
 # 배경 요소 출력
 # =========================
 st.markdown("<div class='ground'></div>", unsafe_allow_html=True)
+st.markdown("<div class='dark'></div>", unsafe_allow_html=True)
 
-if weather == "맑음":
-    st.markdown("<div class='sun'></div>", unsafe_allow_html=True)
+# 구름 개수 조절
+for _ in range(theme["clouds"]):
     st.markdown("<div class='cloud'></div>", unsafe_allow_html=True)
 
-elif weather == "구름":
-    st.markdown("<div class='cloud'></div>", unsafe_allow_html=True)
-    st.title("🌤️ 방배동 날씨")
+# 비는 비일 때만
+if weather == "비":
+    for _ in range(8):
+        st.markdown("<div class='rain'></div>", unsafe_allow_html=True)
+        st.title("🌤️ 방배동 날씨")
 
-# =========================
-# 현재 날씨 카드
-# =========================
 st.markdown(f"""
 <div class="card">
-    <h2>현재 온도: {temp}°C</h2>
-    <p>상태: {weather}</p>
+<h2>현재 온도: {temp}°C</h2>
+<p>상태: {weather}</p>
 </div>
 """, unsafe_allow_html=True)
 
 # =========================
-# 📊 기상 인덱스 (완전 한글화)
+# 📊 인덱스 (완전 복구)
 # =========================
 st.markdown(f"""
 <div class="card">
@@ -165,32 +215,20 @@ st.markdown(f"""
 </div>
 
 <div class="box">
-🌡️<br><b>체감</b><br>
-{"따뜻함 ☀️" if temp >= 23 else "선선함 🍃" if temp >= 15 else "추움 ❄️"}
+👁️<br><b>가시거리</b><br>{visibility}
+</div>
+
+<div class="box">
+😷<br><b>미세먼지</b><br>{dust}
 </div>
 
 </div>
 
 <p style="margin-top:10px; color:gray;">
-👉 이 인덱스는 실제 체감 날씨와 시간 정보를 기반으로 계산됩니다.
+👉 가시거리는 하늘 상태를 기반으로 체감 시야를 나타냅니다.
+<br>
+👉 미세먼지는 습도 기반으로 추정된 실시간 환경 지표입니다.
 </p>
 
-</div>
-""", unsafe_allow_html=True)
-
-# =========================
-# 코디 추천
-# =========================
-if temp >= 28:
-    outfit = "민소매 + 반바지"
-elif temp >= 20:
-    outfit = "반팔 + 셔츠"
-else:
-    outfit = "후드 / 자켓"
-
-st.markdown(f"""
-<div class="card">
-<h3>👕 코디 추천</h3>
-<p>{outfit}</p>
 </div>
 """, unsafe_allow_html=True)
