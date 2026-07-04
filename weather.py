@@ -204,9 +204,9 @@ st.markdown("<h1 class='main-title'>📍 방배동 날씨 동화 세계</h1>", u
 st.markdown("<p class='sub-title'>실시간 대기질 및 기온 연동 애니메이션 인포그래픽</p>", unsafe_allow_html=True)
 
 # 3) [버그 수정 완료] Lottie 캐릭터 애니메이션 단독 호출 (HTML 깨짐 원인 제거)
-lottie_motion = load_lottieurl(lottie_url)
-if lottie_motion:
-    st_lottie(lottie_motion, height=160, key="center_lottie_final_perfect")
+# lottie_motion = load_lottieurl(lottie_url)
+# if lottie_motion:
+    # st_lottie(lottie_motion, height=160, key="center_lottie_final_perfect")
 
 # 4) 메인 현재 기온 카드
 st.markdown(f"""
