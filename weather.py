@@ -2,43 +2,35 @@ import streamlit as st
 import requests
 from streamlit_lottie import st_lottie
 
-# =========================================
-# 1. 기본 설정
-# =========================================
 st.set_page_config(
-    page_title="방배동 날씨",
-    page_icon="🌤️",
+    page_title="방배동 날씨 세계 🌤️",
+    page_icon="🌈",
     layout="centered"
 )
 
-st.markdown("""
-<style>
-#MainMenu {visibility: hidden;}
-footer {visibility: hidden;}
-header {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
-
-
-# =========================================
-# 2. 날씨 API
-# =========================================
+# =========================
+# 1. 날씨 데이터
+# =========================
 @st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
 
+    default = (22, "Clear", "맑음", "보통", "15km", "05:32", "19:51")
+
     try:
-        r = requests.get(url, timeout=5)
-        data = r.json()
+        res = requests.get(url, timeout=5)
+        data = res.json()
 
         current = data["current_condition"][0]
         astro = data["weather"][0]["astronomy"][0]
 
-        temp = round(float(current["temp_C"]))
-        desc = current["weatherDesc"][0]["value"]
-
+        temp = int(float(current["temp_C"]))
+        desc = current["weatherDesc"][0]["value"].lower()
         humidity = int(current["humidity"])
         visibility = current["visibility"] + "km"
+
+        sunrise = astro["sunrise"]
+        sunset = astro["sunset"]
 
         if humidity > 85:
             dust = "좋음"
@@ -47,144 +39,198 @@ def get_weather():
         else:
             dust = "나쁨"
 
-        return temp, desc, dust, visibility, astro["sunrise"], astro["sunset"]
+        weather_main = "Clear"
+        if "cloud" in desc:
+            weather_main = "Clouds"
+        elif "rain" in desc:
+            weather_main = "Rain"
+        elif "snow" in desc:
+            weather_main = "Snow"
+
+        return temp, weather_main, desc, dust, visibility, sunrise, sunset
 
     except:
-        return 22, "Clear", "보통", "15km", "06:00", "18:00"
+        return default
 
 
-temp, desc, dust, visibility, sunrise, sunset = get_weather()
+temp, weather_main, weather_desc, dust, visibility, sunrise, sunset = get_weather()
 
 dust_color = "#2ed573" if dust in ["좋음", "보통"] else "#ff4757"
 
 
-# =========================================
-# 3. UI (여기서 핵심: Streamlit 기본 카드만 사용)
-# → CSS로 카드 숨김 문제 완전히 제거
-# =========================================
+# =========================
+# 2. 테마 (핵심)
+# =========================
+themes = {
+    "Clear": {
+        "sky": "#74b9ff",
+        "ground": "#55efc4"
+    },
+    "Clouds": {
+        "sky": "#a4b0be",
+        "ground": "#2ed573"
+    },
+    "Rain": {
+        "sky": "#2f3640",
+        "ground": "#1dd1a1"
+    },
+    "Snow": {
+        "sky": "#dfe6e9",
+        "ground": "#ffffff"
+    }
+}
 
-st.title("🌤️ 방배동 실시간 날씨")
-
-st.subheader(f"현재 기온: {temp}°C")
-st.write(f"상태: {desc}")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("일출", sunrise)
-    st.metric("미세먼지", dust)
-
-with col2:
-    st.metric("일몰", sunset)
-    st.metric("가시거리", visibility)
-
-st.markdown("---")
-
-st.subheader("👕 오늘 코디 추천")
-
-if temp >= 28:
-    st.write("민소매 / 반팔 / 린넨")
-elif temp >= 23:
-    st.write("반팔 셔츠 / 면바지")
-elif temp >= 17:
-    st.write("맨투맨 / 가디건")
-elif temp >= 10:
-    st.write("니트 / 자켓")
-else:
-    st.write("패딩 / 목도리")
-st.markdown("""
+theme = themes.get(weather_main, themes["Clear"])
+st.markdown(f"""
 <style>
 
-/* ===== 안정 배경 ===== */
-.stApp {
-    background: linear-gradient(to bottom, #74b9ff, #a29bfe);
-}
+/* =========================
+   배경 (절대 고정)
+========================= */
+html, body, [data-testid="stAppViewContainer"] {{
+    background: {theme["sky"]};
+    font-family: sans-serif;
+}}
 
-/* ===== 언덕 ===== */
-.stApp::after {
-    content:"";
-    position:fixed;
-    bottom:-120px;
-    left:-10%;
-    width:120%;
-    height:300px;
-    background:#55efc4;
-    border-radius:50%;
-    z-index:0;   /* ⭐ 음수 금지 */
-}
+/* 땅 */
+[data-testid="stAppViewContainer"]::after {{
+    content: "";
+    position: fixed;
+    bottom: -120px;
+    left: 0;
+    width: 100%;
+    height: 260px;
+    background: {theme["ground"]};
+    border-radius: 50% 50% 0 0;
+    z-index: 0;
+}}
 
-/* ===== 태양 ===== */
-.sun {
-    position: absolute;   /* ⭐ fixed 금지 */
+/* =========================
+   배경 오브젝트 (fixed)
+========================= */
+.sun {{
+    position: fixed;
     top: 80px;
-    right: 80px;
+    right: 100px;
     width: 80px;
     height: 80px;
     background: radial-gradient(circle,#ffeaa7,#fdcb6e);
     border-radius: 50%;
-    box-shadow: 0 0 40px #fdcb6e;
-    animation: pulse 3s infinite alternate;
-    z-index: 2;
-}
+    z-index: 0;
+}}
 
-@keyframes pulse {
-    from { transform: scale(1); }
-    to { transform: scale(1.1); }
-}
-
-/* ===== 구름 ===== */
-.cloud {
-    position: absolute;   /* ⭐ fixed → absolute */
-    top: 120px;
+.cloud {{
+    position: fixed;
+    top: 140px;
     left: -200px;
     width: 120px;
     height: 40px;
     background: white;
     border-radius: 50px;
     animation: move 25s linear infinite;
-    z-index: 2;
-}
+    z-index: 0;
+}}
 
-@keyframes move {
-    from { left: -200px; }
-    to { left: 110%; }
-}
+@keyframes move {{
+    from {{ left: -200px; }}
+    to {{ left: 110%; }}
+}}
 
-/* ===== 비 ===== */
-.rain {
-    position: absolute;
+/* 비 (조건부만 보여야 함) */
+.rain {{
+    position: fixed;
     width: 2px;
     height: 20px;
     background: #74b9ff;
     animation: fall 1s linear infinite;
-    z-index: 2;
-}
+    z-index: 0;
+}}
 
-@keyframes fall {
-    0% { transform: translateY(-100px); }
-    100% { transform: translateY(100vh); }
-}
+@keyframes fall {{
+    0% {{ transform: translateY(-10%); }}
+    100% {{ transform: translateY(110vh); }}
+}}
 
-/* ===== 눈 ===== */
-.snow {
-    position: absolute;
-    width: 6px;
-    height: 6px;
+/* =========================
+   UI 카드 (절대 안정)
+========================= */
+.card {{
     background: white;
-    border-radius: 50%;
-    animation: snow 4s linear infinite;
-    z-index: 2;
-}
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    position: relative;
+    z-index: 10;
+}}
 
-@keyframes snow {
-    0% { transform: translateY(-100px); }
-    100% { transform: translateY(100vh); }
-}
+.grid {{
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}}
+
+.box {{
+    background: #f1f2f6;
+    padding: 10px;
+    border-radius: 12px;
+    text-align: center;
+    height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}}
+
+.title {{
+    text-align: center;
+    font-size: 26px;
+    font-weight: bold;
+}}
 
 </style>
+""", unsafe_allow_html=True)
 
-<div class="sun"></div>
-<div class="cloud"></div>
-<div class="rain"></div>
-<div class="snow"></div>
+
+# =========================
+# 3. 배경 오브젝트 (핵심 수정)
+# =========================
+st.markdown('<div class="sun"></div>', unsafe_allow_html=True)
+st.markdown('<div class="cloud"></div>', unsafe_allow_html=True)
+
+# 👉 비는 "조건부"
+if weather_main == "Rain":
+    st.markdown('<div class="rain"></div>', unsafe_allow_html=True)
+
+
+# =========================
+# 4. UI
+# =========================
+st.markdown("<div class='title'>방배동 날씨</div>", unsafe_allow_html=True)
+
+st.markdown(f"""
+<div class="card">
+<h2>🌡 현재 {temp}°C / {weather_desc}</h2>
+</div>
+""", unsafe_allow_html=True)
+
+
+st.markdown(f"""
+<div class="card">
+<h3 style="text-align:center;">📊 기상 인덱스</h3>
+
+<div class="grid">
+    <div class="box">🌅<br>{sunrise}</div>
+    <div class="box">🌇<br>{sunset}</div>
+    <div class="box">😷<br>{dust}</div>
+    <div class="box">👁<br>{visibility}</div>
+</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+st.markdown(f"""
+<div class="card">
+👗 오늘 코디 추천<br><br>
+<b>{ "여름 반팔" if temp > 23 else "겉옷 필수" }</b>
+</div>
 """, unsafe_allow_html=True)
