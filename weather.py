@@ -3,15 +3,30 @@ import requests
 from datetime import datetime
 
 st.set_page_config(
-    page_title="방배동 날씨 월드",
-    page_icon="🌤️",
+    page_title="방배동 날씨 월드 🌤️",
+    page_icon="🌈",
     layout="centered"
 )
 
+# =========================
+# 날씨 API
+# =========================
 @st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
-    default = (22, "Clear", "맑음", "보통", "15km", "05:32", "19:51")
+
+    # ✅ 반드시 9개 맞춤 (이게 핵심)
+    default = (
+        22,
+        "Clear",
+        "맑음",
+        "기본 날씨 데이터입니다",
+        "보통",
+        "일반적인 공기 상태입니다",
+        "15km",
+        "05:32",
+        "19:51"
+    )
 
     try:
         data = requests.get(url, timeout=5).json()
@@ -27,7 +42,7 @@ def get_weather():
         sunrise = astro["sunrise"]
         sunset = astro["sunset"]
 
-        # 공기질 해석
+        # 공기질
         if humidity > 85:
             dust = "좋음"
             dust_desc = "공기가 매우 깨끗한 상태입니다"
@@ -38,28 +53,28 @@ def get_weather():
             dust = "나쁨"
             dust_desc = "건조하거나 탁한 공기입니다"
 
-        # 날씨 분류
+        # 날씨
         weather = "Clear"
-        weather_desc_kr = "맑음"
+        weather_desc = "맑음"
         weather_detail = "하늘이 맑고 햇빛이 좋은 날씨입니다"
 
         if "cloud" in desc:
             weather = "Clouds"
-            weather_desc_kr = "구름 많음"
-            weather_detail = "구름이 하늘을 많이 덮고 있습니다"
+            weather_desc = "구름 많음"
+            weather_detail = "구름이 하늘을 덮고 있습니다"
         elif "rain" in desc:
             weather = "Rain"
-            weather_desc_kr = "비"
+            weather_desc = "비"
             weather_detail = "현재 비가 내리고 있습니다"
         elif "snow" in desc:
             weather = "Snow"
-            weather_desc_kr = "눈"
+            weather_desc = "눈"
             weather_detail = "눈이 내리는 겨울 날씨입니다"
 
-        return temp, weather, weather_desc_kr, weather_detail, dust, dust_desc, visibility, sunrise, sunset
+        return temp, weather, weather_desc, weather_detail, dust, dust_desc, visibility, sunrise, sunset
 
     except:
-        return default + ("기본 날씨 데이터입니다",)
+        return default
 
 
 temp, weather_main, weather_desc, weather_detail, dust, dust_desc, visibility, sunrise, sunset = get_weather()
@@ -84,6 +99,7 @@ st.markdown(f"""
     content: "";
     position: fixed;
     bottom: -120px;
+    left: 0;
     width: 100%;
     height: 260px;
     background: {"#1e5631" if is_night else "#55efc4"};
@@ -92,7 +108,7 @@ st.markdown(f"""
 }}
 
 /* =========================
-   OBJECTS
+   OBJECT LAYER (완전 분리)
 ========================= */
 .sun {{
     position: fixed;
@@ -122,8 +138,8 @@ st.markdown(f"""
     height: 40px;
     background: white;
     border-radius: 50px;
-    animation: move 30s linear infinite;
-}}
+    animation: move 28s linear infinite;
+}
 
 @keyframes move {{
     from {{ left: -200px; }}
@@ -144,7 +160,7 @@ st.markdown(f"""
 }}
 
 /* =========================
-   UI (안정)
+   UI CARD (안정화 핵심)
 ========================= */
 .card {{
     background: white;
@@ -152,8 +168,8 @@ st.markdown(f"""
     padding: 18px;
     margin-top: 14px;
     box-shadow: 0 6px 25px rgba(0,0,0,0.1);
-    z-index: 10;
     position: relative;
+    z-index: 10;
 }}
 
 .grid {{
@@ -190,7 +206,7 @@ st.markdown(f"""
 
 
 # =========================
-# 배경
+# 배경 오브젝트
 # =========================
 if is_night:
     st.markdown('<div class="moon"></div>', unsafe_allow_html=True)
@@ -210,14 +226,14 @@ st.markdown("<div class='title'>🌤 방배동 날씨 월드</div>", unsafe_allo
 
 st.markdown(f"""
 <div class="card">
-<h2>🌡 {temp}°C / {weather_desc}</h2>
+<h2>🌡 현재 {temp}°C / {weather_desc}</h2>
 <p class="small">{weather_detail}</p>
 </div>
 """, unsafe_allow_html=True)
 
 
 # =========================
-# 인덱스 (설명 추가 버전)
+# 인덱스 (완전 업그레이드)
 # =========================
 st.markdown(f"""
 <div class="card">
@@ -228,18 +244,18 @@ st.markdown(f"""
     <div class="box">
         🌅 일출
         <div>{sunrise}</div>
-        <div class="small">하루 시작 시간</div>
+        <div class="small">하루가 시작되는 시간</div>
     </div>
 
     <div class="box">
         🌇 일몰
         <div>{sunset}</div>
-        <div class="small">하루 종료 시간</div>
+        <div class="small">하루가 끝나는 시간</div>
     </div>
 
     <div class="box">
         😷 대기
-        <div>{dust}</div>
+        <div style="color:{dust_color}; font-weight:bold;">{dust}</div>
         <div class="small">{dust_desc}</div>
     </div>
 
@@ -255,13 +271,21 @@ st.markdown(f"""
 
 
 # =========================
-# 코디
+# 코디 추천 (업그레이드)
 # =========================
+style = ""
+if temp >= 28:
+    style = "민소매 + 반바지"
+elif temp >= 23:
+    style = "반팔 + 가벼운 바지"
+elif temp >= 17:
+    style = "긴팔 + 얇은 외투"
+else:
+    style = "두꺼운 외투 필수"
+
 st.markdown(f"""
 <div class="card">
-👗 오늘 코디 추천<br><br>
-<b>{
-"반팔 + 가벼운 외출" if temp > 23 else "겉옷 필수 + 보온"
-}</b>
+👗 오늘의 코디 추천<br><br>
+<b>{style}</b>
 </div>
 """, unsafe_allow_html=True)
