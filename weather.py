@@ -8,9 +8,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# =========================
-# 날씨 데이터
-# =========================
 @st.cache_data(ttl=600)
 def get_weather():
     url = "https://wttr.in/Bangbae-dong?format=j1"
@@ -30,66 +27,63 @@ def get_weather():
         sunrise = astro["sunrise"]
         sunset = astro["sunset"]
 
-        # 대기
+        # 공기질 해석
         if humidity > 85:
             dust = "좋음"
+            dust_desc = "공기가 매우 깨끗한 상태입니다"
         elif humidity > 40:
             dust = "보통"
+            dust_desc = "일상 활동에 무리 없는 상태입니다"
         else:
             dust = "나쁨"
+            dust_desc = "건조하거나 탁한 공기입니다"
 
-        # 날씨
+        # 날씨 분류
         weather = "Clear"
+        weather_desc_kr = "맑음"
+        weather_detail = "하늘이 맑고 햇빛이 좋은 날씨입니다"
+
         if "cloud" in desc:
             weather = "Clouds"
+            weather_desc_kr = "구름 많음"
+            weather_detail = "구름이 하늘을 많이 덮고 있습니다"
         elif "rain" in desc:
             weather = "Rain"
+            weather_desc_kr = "비"
+            weather_detail = "현재 비가 내리고 있습니다"
         elif "snow" in desc:
             weather = "Snow"
+            weather_desc_kr = "눈"
+            weather_detail = "눈이 내리는 겨울 날씨입니다"
 
-        return temp, weather, desc, dust, visibility, sunrise, sunset
+        return temp, weather, weather_desc_kr, weather_detail, dust, dust_desc, visibility, sunrise, sunset
 
     except:
-        return default
+        return default + ("기본 날씨 데이터입니다",)
 
 
-temp, weather_main, weather_desc, dust, visibility, sunrise, sunset = get_weather()
+temp, weather_main, weather_desc, weather_detail, dust, dust_desc, visibility, sunrise, sunset = get_weather()
 
 dust_color = "#2ed573" if dust in ["좋음", "보통"] else "#ff4757"
 
-
-# =========================
-# 낮/밤 판단 (진짜 버전)
-# =========================
-def is_night_time():
-    now = datetime.now().hour
-    return now < 6 or now > 18
-
-is_night = is_night_time()
+is_night = datetime.now().hour < 6 or datetime.now().hour > 18
 st.markdown(f"""
 <style>
 
 /* =========================
    BACKGROUND
 ========================= */
-html, body {{
-    margin: 0;
-    padding: 0;
-}}
-
 [data-testid="stAppViewContainer"] {{
     background: {"#0b1a2f" if is_night else "#74b9ff"};
-    position: relative;
 }}
 
 /* =========================
-   GROUND (절대 고정)
+   GROUND
 ========================= */
 [data-testid="stAppViewContainer"]::after {{
     content: "";
     position: fixed;
     bottom: -120px;
-    left: 0;
     width: 100%;
     height: 260px;
     background: {"#1e5631" if is_night else "#55efc4"};
@@ -98,16 +92,8 @@ html, body {{
 }}
 
 /* =========================
-   OBJECT LAYER (완전 fixed)
+   OBJECTS
 ========================= */
-.layer {{
-    position: fixed;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 0;
-}}
-
 .sun {{
     position: fixed;
     top: 80px;
@@ -130,7 +116,7 @@ html, body {{
 
 .cloud {{
     position: fixed;
-    top: 120px;
+    top: 140px;
     left: -200px;
     width: 120px;
     height: 40px;
@@ -144,7 +130,6 @@ html, body {{
     to {{ left: 110%; }}
 }}
 
-/* 비 */
 .rain {{
     position: fixed;
     width: 2px;
@@ -158,18 +143,8 @@ html, body {{
     100% {{ transform: translateY(110vh); }}
 }}
 
-/* 눈 */
-.snow {{
-    position: fixed;
-    width: 6px;
-    height: 6px;
-    background: white;
-    border-radius: 50%;
-    animation: fall 3s linear infinite;
-}}
-
 /* =========================
-   UI (절대 안정)
+   UI (안정)
 ========================= */
 .card {{
     background: white;
@@ -177,8 +152,8 @@ html, body {{
     padding: 18px;
     margin-top: 14px;
     box-shadow: 0 6px 25px rgba(0,0,0,0.1);
-    position: relative;
     z-index: 10;
+    position: relative;
 }}
 
 .grid {{
@@ -190,11 +165,17 @@ html, body {{
 .box {{
     background: #f1f2f6;
     border-radius: 12px;
-    height: 85px;
+    height: 95px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     text-align: center;
+}}
+
+.small {{
+    font-size: 12px;
+    color: #636e72;
+    margin-top: 4px;
 }}
 
 .title {{
@@ -209,10 +190,8 @@ html, body {{
 
 
 # =========================
-# 3. 배경 렌더링 (완전 조건 분리)
+# 배경
 # =========================
-st.markdown('<div class="layer">', unsafe_allow_html=True)
-
 if is_night:
     st.markdown('<div class="moon"></div>', unsafe_allow_html=True)
 else:
@@ -223,43 +202,66 @@ st.markdown('<div class="cloud"></div>', unsafe_allow_html=True)
 if weather_main == "Rain":
     st.markdown('<div class="rain"></div>', unsafe_allow_html=True)
 
-if weather_main == "Snow":
-    st.markdown('<div class="snow"></div>', unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
-
 
 # =========================
-# 4. UI
+# UI
 # =========================
 st.markdown("<div class='title'>🌤 방배동 날씨 월드</div>", unsafe_allow_html=True)
 
 st.markdown(f"""
 <div class="card">
 <h2>🌡 {temp}°C / {weather_desc}</h2>
+<p class="small">{weather_detail}</p>
 </div>
 """, unsafe_allow_html=True)
 
 
+# =========================
+# 인덱스 (설명 추가 버전)
+# =========================
 st.markdown(f"""
 <div class="card">
 <h3 style="text-align:center;">📊 기상 인덱스</h3>
 
 <div class="grid">
-    <div class="box">🌅<br>{sunrise}</div>
-    <div class="box">🌇<br>{sunset}</div>
-    <div class="box">😷<br>{dust}</div>
-    <div class="box">👁<br>{visibility}</div>
+
+    <div class="box">
+        🌅 일출
+        <div>{sunrise}</div>
+        <div class="small">하루 시작 시간</div>
+    </div>
+
+    <div class="box">
+        🌇 일몰
+        <div>{sunset}</div>
+        <div class="small">하루 종료 시간</div>
+    </div>
+
+    <div class="box">
+        😷 대기
+        <div>{dust}</div>
+        <div class="small">{dust_desc}</div>
+    </div>
+
+    <div class="box">
+        👁 가시거리
+        <div>{visibility}</div>
+        <div class="small">시야 확보 상태</div>
+    </div>
+
 </div>
 </div>
 """, unsafe_allow_html=True)
 
 
+# =========================
+# 코디
+# =========================
 st.markdown(f"""
 <div class="card">
-👗 코디 추천<br><br>
+👗 오늘 코디 추천<br><br>
 <b>{
-"반팔 OK" if temp > 23 else "겉옷 필수"
+"반팔 + 가벼운 외출" if temp > 23 else "겉옷 필수 + 보온"
 }</b>
 </div>
 """, unsafe_allow_html=True)
