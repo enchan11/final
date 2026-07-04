@@ -92,3 +92,99 @@ elif temp >= 10:
     st.write("니트 / 자켓")
 else:
     st.write("패딩 / 목도리")
+    st.markdown("""
+<style>
+
+/* 배경 */
+.stApp {
+    background: linear-gradient(to bottom, #74b9ff, #a29bfe);
+}
+
+/* 언덕 */
+.stApp::after {
+    content:"";
+    position:fixed;
+    bottom:-120px;
+    left:-10%;
+    width:120%;
+    height:300px;
+    background:#55efc4;
+    border-radius:50%;
+    z-index:-1;
+}
+
+/* 태양 */
+.sun {
+    position:fixed;
+    top:80px;
+    right:80px;
+    width:80px;
+    height:80px;
+    background:radial-gradient(circle,#ffeaa7,#fdcb6e);
+    border-radius:50%;
+    box-shadow:0 0 40px #fdcb6e;
+    animation:pulse 3s infinite alternate;
+    z-index:-1;
+}
+
+@keyframes pulse {
+    from {transform:scale(1);}
+    to {transform:scale(1.1);}
+}
+
+/* 구름 */
+.cloud {
+    position:fixed;
+    top:120px;
+    left:-200px;
+    width:120px;
+    height:40px;
+    background:white;
+    border-radius:50px;
+    animation:move 25s linear infinite;
+    z-index:-1;
+}
+
+@keyframes move {
+    from {left:-200px;}
+    to {left:110%;}
+}
+
+/* 비 */
+.rain {
+    position:fixed;
+    width:2px;
+    height:20px;
+    background:#74b9ff;
+    animation:fall 1s linear infinite;
+    z-index:-1;
+}
+
+@keyframes fall {
+    0% {transform:translateY(-100px);}
+    100% {transform:translateY(100vh);}
+}
+
+/* 눈 */
+.snow {
+    position:fixed;
+    width:6px;
+    height:6px;
+    background:white;
+    border-radius:50%;
+    animation:snow 4s linear infinite;
+    z-index:-1;
+}
+
+@keyframes snow {
+    0% {transform:translateY(-100px);}
+    100% {transform:translateY(100vh);}
+}
+
+</style>
+
+<div class="sun"></div>
+<div class="cloud"></div>
+<div class="rain"></div>
+<div class="snow"></div>
+""", unsafe_allow_html=True)
